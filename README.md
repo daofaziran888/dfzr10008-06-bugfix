@@ -73,5 +73,26 @@ npm run dev
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
 
+### 数据模型封装：草稿、快照与并发控制
+
+- 模型封装上的「字段映射、聚合规则」是草稿工作副本，`PUT /api/datapack/{id}`
+  保存编辑并把 `version` 加一；请求必须带 `expected_version` 做乐观锁，
+  两名编辑同时提交时只有基于最新版本的那一个能成功，过期版本返回 409 语义提示。
+- 「发布封装」会把当时的工作副本深拷贝成一条不可变快照
+  （`GET /api/datapack/{id}/snapshots`），历史快照只追加、不改写。
+- 接口配置不直接读草稿，而是通过 `GET /api/datapack/contract?code=...&snapshot_no=...`
+  或 `GET /api/apigen/{id}/contract` 读冻结快照；草稿把 `amount→gmv` 改成
+  `amount→net_gmv` 后，已发布接口仍按旧快照回放，重新进入详情页可同时看到
+  草稿口径与各次发布快照。
+- 列表支持按封装编号（`keyword`）与字段映射（`字段映射`）联合过滤，
+  多条件为「与」，只返回命中的模型封装行。
+
+### 后端回归测试
+
+```bash
+cd backend
+.venv/bin/python -I tests/test_datapack_flow.py
+```
+
 领域：数据工程
 子方向：数据分析与数据应用
